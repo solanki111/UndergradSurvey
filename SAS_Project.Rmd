@@ -1,0 +1,176 @@
+---
+title: "SAS Project"
+author: "Abhishek Singh (17251693)"
+date: "18 April 2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+### Reading the data
+```{r}
+data <- read.csv("C:/Users/solab/OneDrive/Documents/Data_Science_Notes/Topics_Data_Analytics/MUSUrvey.csv", header=T, row.names=1, na.strings = c(""))
+pairs(data)
+```
+
+###View missing and unique values
+```{r}
+sapply(data,function(x) sum(is.na(x)))
+sapply(data, function(x) length(unique(x)))
+library(Amelia)
+missmap(data, main = "Missing values vs observed")
+```
+
+###Treating the NA values. Replacing the numeric variables with their mean values.
+```{r}
+data$Hours[is.na(data$Hours)] <- mean(data$Hours, na.rm=T)
+data$Societies[is.na(data$Societies)] <- mean(data$Societies, na.rm=T)
+```
+
+###Since not able to treat categorical variables therefore discarding it.
+###Discarding the row
+```{r}
+data <- data[!is.na(data$CYr),]
+data <- data[!is.na(data$Dept),]
+data <- data[!is.na(data$ExtraH),]
+data <- data[!is.na(data$CG),]
+data <- data[!is.na(data$EG),]
+data <- data[!is.na(data$Travel),]
+```
+
+### Finding the best subset model
+```{r}
+library(leaps)
+best.subset <- regsubsets(EG ~ CYr+Dept+Hours+ExtraH+CG+Travel+Work+Societies+Party,
+           data = data,
+           nbest = 1,       # 1 best model for each number of predictors
+           nvmax = NULL,    # NULL for no limit on number of variables
+           force.in = NULL, force.out = NULL,
+           method = "exhaustive")
+best.subset
+summary.out <- summary(best.subset)
+as.data.frame(summary.out$outmat)
+
+```
+
+
+###It'll show how many predictors are good in model including the factors of variables.
+```{r}
+which.max(summary.out$adjr2)
+```
+
+###Viewing the predictors for best subset model
+```{r}
+
+summary.out$which[15,]
+```
+
+###Best predictors came out to be are CYr, Dept, ExtraH, CG, Travel, Work, Party
+###Thus, selecting only these predictors
+```{r}
+best.subset.data <- within(data, {
+  #CYr   <- NULL         # Delete
+  #Dept  <- NULL
+  Hours <- NULL
+  #ExtraH  <- NULL
+  #CG  <- NULL
+  #EG <- NULL
+  #Travel  <- NULL
+  #Work  <- NULL
+  Societies  <- NULL
+  #Party  <- NULL
+  Arts  <- NULL
+  EStudy  <- NULL
+  CG1  <- NULL
+  EG1  <- NULL
+})
+```
+
+###Dividing the data between training and test
+```{r}
+
+library(nnet) 
+alpha<-0.7
+d <- sort(sample(nrow(best.subset.data), nrow(best.subset.data)*alpha))
+train <- best.subset.data[d,]
+test <- best.subset.data[-d,]
+```
+
+###Fitting logistic regression
+```{r}
+
+model <- multinom(EG ~ ., data=train)
+summary(model)
+fitted.results <- predict(model, test, "probs")
+```
+
+###Assigning probability value greater than 0.5 as 1 else 0. It'll also replace NANs with 0 as they are nothing but value close to 0.
+```{r}
+
+fitted.results <- ifelse(fitted.results < 0.5, 0, 1)
+head(fitted.results)
+```
+
+###Converting the dummy values of fitted.results and test$EG into "a", "b", "c" and "d" levels, so that accuracy can be calculated.
+```{r}
+pred.EG <- 0
+for(i in 1:nrow(fitted.results)) {
+  pred.EG[i] <- ifelse(fitted.results[i,1] == 1, "a",
+                ifelse(fitted.results[i,2] == 1, "b",
+                  ifelse(fitted.results[i,3] == 1, "c", "d")))
+            }
+
+
+expected.EG <- ifelse(test$EG == 1.1, "a",
+                ifelse(test$EG == 2.1, "b",
+                  ifelse(test$EG == 2.2, "c", "d")))
+
+EG.table = table("Expected Value"=expected.EG, 'Predicted value'= pred.EG)
+prop.table(EG.table)
+misClasificError <- mean(pred.EG != expected.EG)
+print(paste('Accuracy', (1-mean(pred.EG != expected.EG))))
+```
+
+# Performing another logistic regression for Predicting the department of students.
+```{r}
+sas1 <- read.csv("C:/Users/solab/OneDrive/Documents/Data_Science_Notes/Topics_Data_Analytics/MUSUrvey.csv", header=T, row.names=1, na.strings = c(""))
+
+```
+
+###Treating the NA values. Replacing the numeric variables with their mean values.
+###Since not able to treat categorical variables therefore discarding it.
+###Discarding the row
+```{r}
+sapply(sas1,function(x) sum(is.na(x)))
+sas1$Hours[is.na(sas1$Hours)] <- mean(sas1$Hours, na.rm=T)
+sas1$Societies[is.na(sas1$Societies)] <- mean(sas1$Societies, na.rm=T)
+sapply(sas1,function(x) sum(is.na(x)))
+```
+
+###Fitting the model
+```{r}
+f = glm(Arts~Hours+EStudy+CG1+Societies+Party, family = "binomial", data=sas1)
+summary(f)
+```
+
+###Assigning probability values greater than 0.5 as 1 or else 0.
+```{r}
+prob = predict(f, type="response")
+pred = factor(ifelse(prob <= .5, "No","Yes"))
+
+```
+
+###Calculating the error
+```{r}
+tab1=table(pred, sas1$Arts)
+tab1
+er1 = ((tab1[2,1]+tab1[1,2])/sum(tab1))*100
+er1
+```
+
