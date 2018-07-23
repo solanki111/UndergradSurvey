@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Reading the data
 ```{r}
-data <- read.csv("C:/Users/solab/OneDrive/Documents/Data_Science_Notes/Topics_Data_Analytics/MUSUrvey.csv", header=T, row.names=1, na.strings = c(""))
+data <- read.csv("C:/Users/../MUSUrvey.csv", header=T, row.names=1, na.strings = c(""))
 pairs(data)
 ```
 
